@@ -56,7 +56,7 @@ public class RemotingCommand {
     public ByteBuffer encode() throws UnsupportedEncodingException {
         final int recodeTotalLengthByteSize = 4;//用int去记录总长度，4个字节
         final int recodeHeaderLengthByteSize = 4;//用int去记录总长度，4个字节
-        int totalLen = 0;
+        int totalLen = recodeTotalLengthByteSize;
         // 头部数据
         byte[] header = RemotingSerialize.encodeHeader(this);
         int headerLen = header.length;
@@ -67,7 +67,6 @@ public class RemotingCommand {
         }
         totalLen += headerLen;
         ByteBuffer byteBuffer = ByteBuffer.allocate(totalLen + recodeTotalLengthByteSize + recodeHeaderLengthByteSize);
-
         byteBuffer.putInt(totalLen);
         byteBuffer.putInt(headerLen);
         byteBuffer.put(header);
@@ -83,7 +82,7 @@ public class RemotingCommand {
         return decode(ByteBuffer.wrap(bytes));
     }
 
-    private static RemotingCommand decode(ByteBuffer byteBuffer) throws UnsupportedEncodingException {
+    public static RemotingCommand decode(ByteBuffer byteBuffer) throws UnsupportedEncodingException {
         // 在解码器中会采用基于长度的解码器，因此处理的是去掉记录总长度字段的byteBuffer
         int totalLen = byteBuffer.limit();//头部长度+头部数据+body数据
         int headerLen = byteBuffer.getInt() & 0xFFFFFF;

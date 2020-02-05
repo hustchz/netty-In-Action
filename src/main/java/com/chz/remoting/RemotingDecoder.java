@@ -7,7 +7,7 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import org.jboss.logging.Logger;
 
 import java.nio.ByteBuffer;
-@ChannelHandler.Sharable
+
 public class RemotingDecoder extends LengthFieldBasedFrameDecoder {
 
     private final static int maxFrameLength = 16777216;

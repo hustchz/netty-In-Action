@@ -79,7 +79,10 @@ public class EchoServer extends RemotingAbstract implements RemotingServer{
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel socketChannel) throws Exception {
-                        socketChannel.pipeline().addLast(executorGroup, nettyServerHandler);
+                        socketChannel.pipeline().addLast(executorGroup,
+                                new RemotingEncoder(),
+                                new RemotingDecoder(),
+                                nettyServerHandler);
                     }
                 });
         try {
@@ -115,7 +118,7 @@ public class EchoServer extends RemotingAbstract implements RemotingServer{
     class NettyServerHandler extends ChannelHandlerAdapter{
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            logger.info("a message can be read......"+msg);
+            logger.info("a message can be read......"+((RemotingCommand)msg).getRequestId());
         }
 
         @Override

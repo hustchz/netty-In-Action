@@ -78,6 +78,7 @@ public class EchoClient extends RemotingAbstract implements RemotingClient {
                     protected void initChannel(SocketChannel socketChannel) throws Exception {
                         socketChannel.pipeline().addLast(executorGroup,
                                 new RemotingEncoder(),
+                                new RemotingDecoder(),
                                 nettyClientHandler
                                 );
                     }
@@ -182,7 +183,6 @@ public class EchoClient extends RemotingAbstract implements RemotingClient {
         @Override
         protected void messageReceived(ChannelHandlerContext ctx, RemotingCommand command) throws Exception {
             logger.info(command.getFlag());
-
         }
     }
 

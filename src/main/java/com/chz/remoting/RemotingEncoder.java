@@ -31,10 +31,10 @@ public class RemotingEncoder extends MessageToByteEncoder<RemotingCommand> {
     @Override
     public void encode(ChannelHandlerContext ctx, RemotingCommand remotingCommand, ByteBuf out)
         throws Exception {
-        logger.info(remotingCommand.getRequestId());
         ByteBuffer byteBuffer = remotingCommand.encode();
         try{
             out.writeBytes(byteBuffer);
+            logger.info("request-"+remotingCommand.getRequestId()+"发送成功");
         }catch (Exception e) {
             final Channel channel = ctx.channel();
             logger.error("encode exception, " + channel.remoteAddress());
