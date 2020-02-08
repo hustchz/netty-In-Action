@@ -4,6 +4,7 @@ import com.chz.remoting.common.Pair;
 import com.chz.remoting.common.RemotingRequestProcessor;
 import com.chz.remoting.exception.RemotingConnectException;
 import com.chz.remoting.protocol.RemotingCommand;
+import com.chz.remoting.utils.ChannelEventListener;
 import com.chz.remoting.utils.RemotingUtils;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
@@ -29,7 +30,7 @@ public class EchoClient extends RemotingAbstract implements RemotingClient {
     private Bootstrap bootstrap;
     private EventLoopGroup workerGroup;
     private EventExecutorGroup executorGroup;// 工作线程组
-
+    private ChannelEventListener listener;
     private final int workerThreadNum = 1;//连接建立后childGroup线程池的线程数
     private final int executeThreadNum = 4;//工作线程为4个
 
@@ -41,6 +42,15 @@ public class EchoClient extends RemotingAbstract implements RemotingClient {
         this.hostname = hostname;
         this.port = port;
         init();
+    }
+    public EchoClient(String hostname, int port,ChannelEventListener listener){
+        this.hostname = hostname;
+        this.port = port;
+        this.listener = listener;
+        init();
+    }
+    public void setChannelEventListener(ChannelEventListener listener){
+        this.listener = listener;
     }
     private void init(){
         this.bootstrap = new Bootstrap();
@@ -88,6 +98,9 @@ public class EchoClient extends RemotingAbstract implements RemotingClient {
                     }
                 });
 
+        if(null != listener){
+            eventExecutor.start();
+        }
     }
 
     @Override
@@ -188,12 +201,16 @@ public class EchoClient extends RemotingAbstract implements RemotingClient {
         }
     }
 
+    @Override
+    protected ChannelEventListener getChannelEventListener() {
+        return listener;
+    }
+
     @ChannelHandler.Sharable
     class NettyClientHandler extends SimpleChannelInboundHandler<RemotingCommand>{
-
         @Override
         protected void messageReceived(ChannelHandlerContext ctx, RemotingCommand command) throws Exception {
-            logger.info(command.getFlag());
+            logger.info(command);
             processReceivedMessage(ctx,command);
         }
     }

@@ -4,6 +4,7 @@ package com.chz.remoting;
 import com.chz.remoting.common.Pair;
 import com.chz.remoting.common.RemotingRequestProcessor;
 import com.chz.remoting.protocol.RemotingCommand;
+import com.chz.remoting.utils.ChannelEventListener;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -12,9 +13,7 @@ import org.jboss.logging.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.*;
 
 /**
  * 将客户端服务端共同的操作封装起来
@@ -24,6 +23,7 @@ public abstract class RemotingAbstract {
     private static Logger logger = Logger.getLogger(RemotingAbstract.class);
     /* 针对消息的code类型，去寻找有无相应的processor去做request的处理*/
     protected Map<Integer,Pair<RemotingRequestProcessor, ExecutorService>> processorTable = new HashMap<>(64);
+    protected final ChannelEventExecutor eventExecutor = new ChannelEventExecutor();
     /*服务端和客户端都通过该方法进行消息传递*/
     public void invokeImpl(final Channel channel,final RemotingCommand command){
         //向channel中写数据
@@ -110,6 +110,59 @@ public abstract class RemotingAbstract {
             ctx.writeAndFlush(response);
             logger.info("没有指定的processor处理request");
         }
-
     }
+
+    class ChannelEventExecutor implements Runnable{
+
+        private final int maxProcessorChannelEventNum = 10000;//最多处理多少ChannelEvent事件
+        private LinkedBlockingQueue<ChannelEvent>queue = new LinkedBlockingQueue<>();
+
+        public void putChannelEvent(ChannelEvent event) throws InterruptedException {
+            if(queue.size() > maxProcessorChannelEventNum){
+                logger.warnf(
+                        "channelEvent is enough , can't add this event{%s} to the queue",event
+                        );
+            }else{
+                logger.info("有channelEvent事件放入阻塞队列中");
+                queue.put(event);
+            }
+        }
+
+        @Override
+        public void run() {
+            final ChannelEventListener listener = getChannelEventListener();
+            for(;;){
+                try {
+                    ChannelEvent event = this.queue.poll(3000, TimeUnit.MILLISECONDS);
+                    if(null != listener && null != event){
+                        logger.info(event);
+                        switch (event.getEventType()){
+                            case CONNECT:{
+                                listener.processOnConnect(event.getAddress(),event.getChannel());
+                                break;
+                            }
+                            case CLOSE:{
+                                listener.processOnClose(event.getAddress(),event.getChannel());
+                                break;
+                            }
+                            case EXCEPTION:{
+                                listener.processOnException(event.getAddress(),event.getChannel());
+                                break;
+                            }
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+            }
+        }
+
+        public void start(){
+            new Thread(this,"ChannelEventThread").start();
+        }
+    }
+
+    protected abstract ChannelEventListener getChannelEventListener();
+
 }

@@ -1,6 +1,7 @@
 package com.chz.remoting;
 
 import com.chz.remoting.protocol.RemotingCommand;
+import com.chz.remoting.utils.ChannelEventListener;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -10,6 +11,7 @@ import io.netty.util.concurrent.EventExecutorGroup;
 import org.jboss.logging.Logger;
 
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -24,16 +26,26 @@ public class EchoServer extends RemotingAbstract implements RemotingServer{
     private EventLoopGroup parentGroup;
     private EventLoopGroup childGroup;
     private EventExecutorGroup executorGroup;// 工作线程组
-
+    private ChannelEventListener listener;
     private final int childThreadNum = 3;//连接建立后childGroup线程池的线程数
     private final int executeThreadNum = 4;//工作线程为4个
 
     // handlers
     private NettyServerHandler nettyServerHandler;//接受客户端请求的handler
+    //private ConnectManagerHandler connectManagerHandler;//将事件封装成一个事件，做后续的listener处理
     public EchoServer(String hostname,int port){
         this.hostname = hostname;
         this.port = port;
         init();//初始化
+    }
+    public EchoServer(String hostname,int port,ChannelEventListener listener){
+        this.listener = listener;
+        this.hostname = hostname;
+        this.port = port;
+        init();//初始化
+    }
+    public void setChannelEventListener(ChannelEventListener listener){
+        this.listener = listener;
     }
     private void init(){
         this.bootstrap = new ServerBootstrap();
@@ -82,9 +94,15 @@ public class EchoServer extends RemotingAbstract implements RemotingServer{
                         socketChannel.pipeline().addLast(executorGroup,
                                 new RemotingEncoder(),
                                 new RemotingDecoder(),
-                                nettyServerHandler);
+                                nettyServerHandler
+                                );
                     }
                 });
+
+        if(null != listener){
+            logger.info("ChannelEventListener任务启动，处理阻塞队列中的事件");
+            eventExecutor.start();
+        }
         try {
             ChannelFuture future = this.bootstrap.bind(new InetSocketAddress(hostname, port)).sync();
             logger.info("服务端启动成功，等待客户端应答");
@@ -114,21 +132,27 @@ public class EchoServer extends RemotingAbstract implements RemotingServer{
         this.invokeImpl(channel,command);
     }
 
+    @Override
+    protected ChannelEventListener getChannelEventListener() {
+        return listener;
+    }
+
     @ChannelHandler.Sharable
-    class NettyServerHandler extends ChannelHandlerAdapter{
+    class NettyServerHandler extends SimpleChannelInboundHandler<RemotingCommand>{
         @Override
-        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            final RemotingCommand command = (RemotingCommand)msg;
-            logger.info("a message can be read......"+command);
-            RemotingCommand response = new RemotingCommand(CommandType.RESPONSE.getCode());
-            response.setRequestId(command.getRequestId());
-            response.setBody("我收到了".getBytes("UTF-8"));
-            ctx.channel().writeAndFlush(response);
+        protected void messageReceived(ChannelHandlerContext ctx, RemotingCommand command) throws Exception {
+            processReceivedMessage(ctx,command);
         }
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
             logger.error("an exception has occurred");
+            if(null != listener){
+                Channel channel = ctx.channel();
+                eventExecutor.putChannelEvent(
+                        new ChannelEvent(ChannelEventType.EXCEPTION,channel,channel.remoteAddress().toString())
+                );
+            }
         }
 
         @Override
@@ -139,6 +163,22 @@ public class EchoServer extends RemotingAbstract implements RemotingServer{
         @Override
         public void channelActive(ChannelHandlerContext ctx) throws Exception {
             logger.info("a client has succeed to connect the server");
+            if(null != listener){
+                Channel channel = ctx.channel();
+                eventExecutor.putChannelEvent(
+                        new ChannelEvent(ChannelEventType.CONNECT,channel,channel.remoteAddress().toString())
+                );
+            }
+        }
+        @Override
+        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+            logger.info("channel is close");
+            if(null != listener){
+                Channel channel = ctx.channel();
+                eventExecutor.putChannelEvent(
+                        new ChannelEvent(ChannelEventType.CLOSE,channel,channel.remoteAddress().toString())
+                );
+            }
         }
     }
 
@@ -146,6 +186,23 @@ public class EchoServer extends RemotingAbstract implements RemotingServer{
         EchoServer server = null ;
         try{
             server = new EchoServer("127.0.0.1",2088);
+            server.setChannelEventListener(new ChannelEventListener() {
+                //做回调 需要先将相应的channelEvent放入阻塞队列中，才能读取做处理
+                @Override
+                public void processOnConnect(String address, Channel channel) {
+                    logger.info("connect:"+address);
+                }
+
+                @Override
+                public void processOnClose(String address, Channel channel) {
+                    logger.info("close:"+address);
+                }
+
+                @Override
+                public void processOnException(String address, Channel channel) {
+                    logger.info("exception:"+address);
+                }
+            });
             server.start();
         }catch (Exception e){
             e.printStackTrace();

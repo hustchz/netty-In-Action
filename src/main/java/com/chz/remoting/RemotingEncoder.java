@@ -45,7 +45,7 @@ public class RemotingEncoder extends MessageToByteEncoder<RemotingCommand> {
                 @Override
                 public void operationComplete(ChannelFuture channelFuture) throws Exception {
                     logger.infof(
-                            "closeChannel: close the connection to remote address[{}] result: {}",channel.remoteAddress(),channelFuture.isSuccess()
+                            "closeChannel: close the connection to remote address[{%s}] result: {%s}",channel.remoteAddress(),channelFuture.isSuccess()
                     );
                 }
             });
