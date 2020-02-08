@@ -1,5 +1,8 @@
 package com.chz.remoting;
 
+import com.chz.remoting.common.Pair;
+import com.chz.remoting.common.RemotingRequestProcessor;
+import com.chz.remoting.exception.RemotingConnectException;
 import com.chz.remoting.protocol.RemotingCommand;
 import com.chz.remoting.utils.RemotingUtils;
 import io.netty.bootstrap.Bootstrap;
@@ -12,6 +15,7 @@ import org.jboss.logging.Logger;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -157,6 +161,13 @@ public class EchoClient extends RemotingAbstract implements RemotingClient {
         }
     }
 
+    @Override
+    public void registerProcessor(int requestCode, RemotingRequestProcessor processor,
+                                  ExecutorService executor) {
+        Pair<RemotingRequestProcessor,ExecutorService> pair = new Pair<>(processor,executor);
+        this.processorTable.put(requestCode,pair);
+    }
+
     public void closeChannel(String address,final Channel channel){
         if(null == channel)return;
         if(null == address || address.equals("")){
@@ -183,6 +194,7 @@ public class EchoClient extends RemotingAbstract implements RemotingClient {
         @Override
         protected void messageReceived(ChannelHandlerContext ctx, RemotingCommand command) throws Exception {
             logger.info(command.getFlag());
+            processReceivedMessage(ctx,command);
         }
     }
 
@@ -191,7 +203,9 @@ public class EchoClient extends RemotingAbstract implements RemotingClient {
         try{
             client = new EchoClient("127.0.0.1",2088);
             client.start();
-            client.invoke("127.0.0.1:2088",new RemotingCommand(1));
+            RemotingCommand command = new RemotingCommand(CommandType.REQUEST.getCode());
+            command.setBody("你好a".getBytes("UTF-8"));
+            client.invoke("127.0.0.1:2088",command);
         }catch (Exception e){
             e.printStackTrace();
         }finally {

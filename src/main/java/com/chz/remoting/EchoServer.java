@@ -118,12 +118,17 @@ public class EchoServer extends RemotingAbstract implements RemotingServer{
     class NettyServerHandler extends ChannelHandlerAdapter{
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            logger.info("a message can be read......"+((RemotingCommand)msg).getRequestId());
+            final RemotingCommand command = (RemotingCommand)msg;
+            logger.info("a message can be read......"+command);
+            RemotingCommand response = new RemotingCommand(CommandType.RESPONSE.getCode());
+            response.setRequestId(command.getRequestId());
+            response.setBody("我收到了".getBytes("UTF-8"));
+            ctx.channel().writeAndFlush(response);
         }
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-            logger.error(cause.getMessage());
+            logger.error("an exception has occurred");
         }
 
         @Override

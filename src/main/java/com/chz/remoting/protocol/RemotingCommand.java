@@ -1,5 +1,6 @@
 package com.chz.remoting.protocol;
 
+import com.chz.remoting.CommandCodeType;
 import com.chz.remoting.CommandType;
 import com.chz.remoting.serialize.RemotingSerialize;
 import io.netty.buffer.ByteBuf;
@@ -21,8 +22,13 @@ public class RemotingCommand {
     private static AtomicInteger requestIndex = new AtomicInteger(0);
     private int flag;//0 代表是请求，1 代表是答复
     private byte [] body;//消息体
+    private int code ;//代表消息的状态，成功失败等
     private int requestId = requestIndex.incrementAndGet();//每一次的请求号都是递增的
     private Map<String,String> extFields;// 自定义的扩展字段
+    public RemotingCommand(int code,int flag){
+        this.code = code;
+        this.flag = flag;
+    }
     public RemotingCommand(int flag){
         this.flag = flag;
     }
@@ -48,6 +54,13 @@ public class RemotingCommand {
     public void setExtFields(Map<String, String> extFields) {
         this.extFields = extFields;
     }
+    public int getCode() {
+        return code;
+    }
+    public void setCode(int code) {
+        this.code = code;
+    }
+
     public Map<String, String> getExtFields() {
         return extFields;
     }
@@ -96,15 +109,15 @@ public class RemotingCommand {
         return command;
     }
 
-    public RemotingCommand createRequestCommand(){
-        return new RemotingCommand(CommandType.REQUEST.getCode());
+    public static RemotingCommand createRequestCommand(int code){
+        return new RemotingCommand(code,CommandType.REQUEST.getCode());
     }
-    public RemotingCommand createResponseCommand(){
-        return new RemotingCommand(CommandType.RESPONSE.getCode());
+    public static RemotingCommand createResponseCommand(int code){
+        return new RemotingCommand(code,CommandType.RESPONSE.getCode());
     }
 
     public static void main(String[] args) throws UnsupportedEncodingException {
-        RemotingCommand command = new RemotingCommand(0);
+        RemotingCommand command = new RemotingCommand(CommandType.REQUEST.getCode());
         Map<String,String>extField = new HashMap<>();
         extField.put("version","1.0.0");
         extField.put("test","true");
@@ -122,5 +135,22 @@ public class RemotingCommand {
             System.out.println(next.getKey()+" "+next.getValue());
         }
 
+    }
+
+    public CommandType getType(){
+        if(isResponseType()){
+            return CommandType.RESPONSE;
+        }
+        return CommandType.REQUEST;
+    }
+
+    public boolean isResponseType(){
+        int bits = 1;
+        return (flag & bits ) == bits;
+    }
+    @Override
+    public String toString() {
+        return "RemotingCommand [code=" + code + " , flag= "+flag+" , id=" + requestId + " , body=" +body+ " ,extFields=" + extFields + " "
+                + "]";
     }
 }

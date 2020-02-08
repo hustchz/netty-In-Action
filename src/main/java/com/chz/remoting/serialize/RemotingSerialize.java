@@ -26,6 +26,8 @@ public class RemotingSerialize {
         headerLen = headerLen
                 // requestId
                 + 4
+                // code
+                + 4
                 // flag
                 + 4
                 // encodeExtFields的长度
@@ -36,6 +38,7 @@ public class RemotingSerialize {
 
         //开始添加头部数据
         headerBuffer.putInt(command.getRequestId());
+        headerBuffer.putInt(command.getCode());
         headerBuffer.putInt(command.getFlag());
         headerBuffer.putInt(encodeExtFieldsLen);
 
@@ -89,6 +92,7 @@ public class RemotingSerialize {
         ByteBuffer headerBuffer = ByteBuffer.wrap(headerBytes);
 
         command.setRequestId(headerBuffer.getInt());
+        command.setCode(headerBuffer.getInt());
         command.setFlag(headerBuffer.getInt());
         int extFieldsLen = headerBuffer.getInt();
         if(extFieldsLen > 0){
@@ -114,5 +118,4 @@ public class RemotingSerialize {
         }
         return map;
     }
-
 }

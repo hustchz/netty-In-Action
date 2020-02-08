@@ -1,6 +1,6 @@
-package com.chz.remoting;
+package com.chz.remoting.exception;
 
-public class RemotingConnectException extends RemotingException{
+public class RemotingConnectException extends RemotingException {
     private static final long serialVersionUID = -5565366231695911316L;
 
     public RemotingConnectException(String addr) {
