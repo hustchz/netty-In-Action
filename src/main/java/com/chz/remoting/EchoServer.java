@@ -1,5 +1,6 @@
 package com.chz.remoting;
 
+import com.chz.remoting.exception.RemotingException;
 import com.chz.remoting.protocol.RemotingCommand;
 import com.chz.remoting.utils.ChannelEventListener;
 import io.netty.bootstrap.ServerBootstrap;
@@ -12,7 +13,9 @@ import org.jboss.logging.Logger;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -49,7 +52,7 @@ public class EchoServer extends RemotingAbstract implements RemotingServer{
     }
     private void init(){
         this.bootstrap = new ServerBootstrap();
-
+        this.semaphore = new Semaphore(1);
         parentGroup = new NioEventLoopGroup(1, new ThreadFactory() {
             private AtomicInteger index = new AtomicInteger(0);
             @Override
@@ -128,8 +131,8 @@ public class EchoServer extends RemotingAbstract implements RemotingServer{
     }
 
     @Override
-    public void invoke(Channel channel, RemotingCommand command) {
-        this.invokeImpl(channel,command);
+    public void invoke(Channel channel, RemotingCommand command,long timeout) throws InterruptedException, RemotingException, TimeoutException {
+        this.invokeSyncImpl(channel,command,timeout);
     }
 
     @Override

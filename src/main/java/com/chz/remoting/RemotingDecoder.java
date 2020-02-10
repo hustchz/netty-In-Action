@@ -16,7 +16,7 @@ public class RemotingDecoder extends LengthFieldBasedFrameDecoder {
     private final static int lengthAdjustment = 0;
     private final static int initialBytesToStrip = 4;
 
-    private Logger logger = Logger.getLogger(RemotingDecoder.class);
+    private static Logger logger = Logger.getLogger(RemotingDecoder.class);
     public RemotingDecoder() {
         super(maxFrameLength, lengthFieldOffset, lengthFieldLength, lengthAdjustment, initialBytesToStrip);
     }

@@ -3,6 +3,7 @@ package com.chz.remoting;
 import com.chz.remoting.common.Pair;
 import com.chz.remoting.common.RemotingRequestProcessor;
 import com.chz.remoting.exception.RemotingConnectException;
+import com.chz.remoting.exception.RemotingException;
 import com.chz.remoting.protocol.RemotingCommand;
 import com.chz.remoting.utils.ChannelEventListener;
 import com.chz.remoting.utils.RemotingUtils;
@@ -15,9 +16,7 @@ import io.netty.util.concurrent.EventExecutorGroup;
 import org.jboss.logging.Logger;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -54,7 +53,7 @@ public class EchoClient extends RemotingAbstract implements RemotingClient {
     }
     private void init(){
         this.bootstrap = new Bootstrap();
-
+        this.semaphore = new Semaphore(1);
         workerGroup = new NioEventLoopGroup(workerThreadNum, new ThreadFactory() {
             private AtomicInteger index = new AtomicInteger(0);
             @Override
@@ -161,17 +160,18 @@ public class EchoClient extends RemotingAbstract implements RemotingClient {
     }
 
     @Override
-    public void invoke(String address, RemotingCommand command) throws RemotingConnectException, InterruptedException {
+    public RemotingCommand invoke(String address, RemotingCommand command,long timeout) throws InterruptedException, RemotingException, TimeoutException {
         final Channel channel = this.createChannel(address);
         // 由于是异步，channel 也可能不可用
         if(null != channel && channel.isActive()){
             //可以操作
-            this.invokeImpl(channel,command);
+            command = this.invokeSyncImpl(channel,command,timeout);
             channel.closeFuture().sync();
         }else{
             this.closeChannel(address,channel);
             throw new RemotingConnectException(address);
         }
+        return command;
     }
 
     @Override
@@ -179,6 +179,21 @@ public class EchoClient extends RemotingAbstract implements RemotingClient {
                                   ExecutorService executor) {
         Pair<RemotingRequestProcessor,ExecutorService> pair = new Pair<>(processor,executor);
         this.processorTable.put(requestCode,pair);
+    }
+
+    @Override
+    public void invokeAsync(String address, RemotingCommand command, long timeout, InvokeCallBack callBack) throws RemotingException, InterruptedException, TimeoutException {
+        final Channel channel = this.createChannel(address);
+        // 由于是异步，channel 也可能不可用
+        if(null != channel && channel.isActive()){
+            //可以操作
+            this.invokeASyncImpl(channel,command,timeout,callBack);
+            channel.closeFuture().sync();
+        }else{
+            this.closeChannel(address,channel);
+            throw new RemotingConnectException(address);
+        }
+
     }
 
     public void closeChannel(String address,final Channel channel){
@@ -222,7 +237,12 @@ public class EchoClient extends RemotingAbstract implements RemotingClient {
             client.start();
             RemotingCommand command = new RemotingCommand(CommandType.REQUEST.getCode());
             command.setBody("你好a".getBytes("UTF-8"));
-            client.invoke("127.0.0.1:2088",command);
+            client.invokeAsync("127.0.0.1:2088", command, 3 * 1000, new InvokeCallBack() {
+                @Override
+                public void operateComplete(ResponseFuture future) {
+                    System.out.println("...................");
+                }
+            });
         }catch (Exception e){
             e.printStackTrace();
         }finally {
